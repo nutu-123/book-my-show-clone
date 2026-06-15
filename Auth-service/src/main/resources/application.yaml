@@ -1,0 +1,78 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: auth-service
+
+  # PostgreSQL DataSource
+  datasource:
+    url: jdbc:postgresql://dpg-d8kemqtdt1ts73a04fig-a.oregon-postgres.render.com/showtime_auth_ssar
+    username: showtime_auth_ssar_user
+    password: eHM6MeySlcV3OTzYisaFXm6fIH9PpqoB
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      pool-name: ShowTimeAuthPool
+
+  # JPA / Hibernate
+  jpa:
+    hibernate:
+      ddl-auto: update        # 'create' on first run, then 'update'
+    defer-datasource-initialization: true
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        default_schema: public
+    open-in-view: false
+
+  # SQL initialization — runs data.sql on startup
+  sql:
+    init:
+      mode: always
+      data-locations: classpath:data.sql
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka:eureka123@localhost:8761/eureka/
+    fetch-registry: true
+    register-with-eureka: true
+
+  instance:
+    prefer-ip-address: false
+    hostname: localhost
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
+    instance-id: ${spring.application.name}:${server.port}
+
+# JWT configuration — MUST match api-gateway
+jwt:
+  secret: ShowTimeSecretKey2024VeryLongSecretKeyForHMAC512AlgorithmMinimum64Characters
+  access-token-expiration: 3600000      # 1 hour  (ms)
+  refresh-token-expiration: 604800000   # 7 days  (ms)
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics
+  endpoint:
+    health:
+      show-details: always
+
+# Logging
+logging:
+  level:
+    com.showtime.auth: DEBUG
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

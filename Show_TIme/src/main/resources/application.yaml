@@ -1,0 +1,62 @@
+server:
+  port: 8761
+
+spring:
+  application:
+    name: discovery-service
+
+  # Basic auth credentials for Eureka dashboard
+  security:
+    user:
+      name: eureka
+      password: eureka123
+
+eureka:
+  instance:
+    hostname: localhost
+
+  client:
+    # This IS the server — it should NOT register with itself
+    register-with-eureka: false
+    fetch-registry: false
+    service-url:
+      defaultZone: http://eureka:eureka123@localhost:8761/eureka/
+
+  server:
+    # Wait time before evicting unavailable instances (ms)
+    wait-time-in-ms-when-sync-empty: 0
+    # How often to check for expired instances (ms)
+    eviction-interval-timer-in-ms: 5000
+    # Disable self-preservation in development
+    enable-self-preservation: false
+    # Renewal threshold
+    renewal-percent-threshold: 0.85
+
+# Actuator endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics
+  endpoint:
+    health:
+      show-details: always
+  info:
+    env:
+      enabled: true
+
+# Application info shown in Eureka dashboard
+info:
+  app:
+    name: ShowTime Discovery Service
+    description: Eureka Service Registry for ShowTime Microservices
+    version: 1.0.0
+
+# Logging
+logging:
+  level:
+    com.netflix.eureka: WARN
+    com.netflix.discovery: WARN
+    com.showtime.discovery: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

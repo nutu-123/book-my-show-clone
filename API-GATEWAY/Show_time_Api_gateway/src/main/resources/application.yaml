@@ -1,0 +1,189 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+
+  # Redis config for rate limiting
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 10
+          max-idle: 5
+          min-idle: 1
+
+  # Spring Cloud Gateway routes
+  cloud:
+    gateway:
+      # Global CORS (handled in CorsConfig.java too — belt and suspenders)
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins:
+              - "http://localhost:5173"   # React dev server
+              - "http://localhost:3000"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+              - PATCH
+            allowedHeaders:
+              - "*"
+            allowCredentials: true
+            maxAge: 3600
+
+      # Default filters applied to ALL routes
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+        - name: RequestRateLimiter
+          args:
+            redis-rate-limiter.replenishRate: 20
+            redis-rate-limiter.burstCapacity: 40
+            redis-rate-limiter.requestedTokens: 1
+            key-resolver: "#{@ipKeyResolver}"
+
+      routes:
+
+        # ─────────────────────────────────────────
+        # AUTH SERVICE ROUTES
+        # ─────────────────────────────────────────
+        - id: auth-service-public
+          uri: lb://auth-service
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: auth-cb
+                fallbackUri: forward:/fallback/auth
+            - AddRequestHeader=X-Source-Gateway, showtime-gateway
+
+        # ─────────────────────────────────────────
+        # MOVIE CATALOG SERVICE ROUTES
+        # ─────────────────────────────────────────
+        - id: movie-catalog-public
+          uri: lb://movie-catalog-service
+          predicates:
+            - Path=/api/movies/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: movie-cb
+                fallbackUri: forward:/fallback/movie
+            - AddRequestHeader=X-Source-Gateway, showtime-gateway
+
+        # ─────────────────────────────────────────
+        # SHOW SERVICE ROUTES
+        # ─────────────────────────────────────────
+        - id: show-service-public
+          uri: lb://show-service
+          predicates:
+            - Path=/api/shows/**, /api/theatres/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: show-cb
+                fallbackUri: forward:/fallback/show
+            - AddRequestHeader=X-Source-Gateway, showtime-gateway
+
+        # ─────────────────────────────────────────
+        # BOOKING SERVICE ROUTES (JWT REQUIRED)
+        # ─────────────────────────────────────────
+        - id: booking-service-secured
+          uri: lb://booking-service
+          predicates:
+            - Path=/api/bookings/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: booking-cb
+                fallbackUri: forward:/fallback/booking
+            - AddRequestHeader=X-Source-Gateway, showtime-gateway
+
+        # ─────────────────────────────────────────
+        # PAYMENT SERVICE ROUTES (JWT REQUIRED)
+        # ─────────────────────────────────────────
+        - id: payment-service-secured
+          uri: lb://payment-service
+          predicates:
+            - Path=/api/payments/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: payment-cb
+                fallbackUri: forward:/fallback/payment
+            - AddRequestHeader=X-Source-Gateway, showtime-gateway
+
+        # ─────────────────────────────────────────
+        # NOTIFICATION SERVICE ROUTES
+        # ─────────────────────────────────────────
+        - id: notification-service
+          uri: lb://notification-service
+          predicates:
+            - Path=/api/notifications/**
+          filters:
+            - AddRequestHeader=X-Source-Gateway, showtime-gateway
+
+      # Actuator route exposure
+      actuator:
+        verbose:
+          enabled: true
+
+# Eureka client config
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka:eureka123@localhost:8761/eureka/
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
+    instance-id: ${spring.application.name}:${server.port}
+
+# JWT Secret — MUST match auth-service secret exactly
+jwt:
+  secret: ShowTimeSecretKey2024VeryLongSecretKeyForHMAC512AlgorithmMinimum64Characters
+  expiration: 3600000   # 1 hour in ms
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, gateway
+  endpoint:
+    health:
+      show-details: always
+    gateway:
+      enabled: true
+
+# Logging
+logging:
+  level:
+    org.springframework.cloud.gateway: INFO
+    com.showtime.gateway: DEBUG
+    reactor.netty: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Public endpoints — JWT filter will skip these
+gateway:
+  public-endpoints:
+    - /api/auth/login
+    - /api/auth/register
+    - /api/auth/refresh
+    - /api/movies
+    - /api/movies/**
+    - /api/shows/**
+    - /api/theatres/**
+    - /actuator/**
+    - /fallback/**
