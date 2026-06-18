@@ -1,0 +1,107 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: booking-service
+
+  # PostgreSQL
+  datasource:
+    url: jdbc:postgresql://localhost:5432/showtime_booking
+    username: postgres
+    password: India@2618
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 15
+      minimum-idle: 3
+      connection-timeout: 30000
+      pool-name: ShowTimeBookingPool
+
+  # JPA
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    open-in-view: false
+
+  # Redis
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 20
+          max-idle: 10
+          min-idle: 2
+
+  # RabbitMQ
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    virtual-host: /
+    listener:
+      simple:
+        acknowledge-mode: manual
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1000
+          multiplier: 2.0
+          max-interval: 10000
+
+# Eureka
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka:eureka123@localhost:8761/eureka/
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
+    instance-id: ${spring.application.name}:${server.port}
+
+# Booking configuration
+booking:
+  seat-lock-ttl-seconds: 600        # 10 minutes seat hold
+  booking-expiry-minutes: 15        # Booking expires if payment not done
+  max-seats-per-booking: 10         # Max seats per transaction
+
+# RabbitMQ exchange/queue names
+rabbitmq:
+  exchange: showtime.exchange
+  routing-keys:
+    booking-confirmed: booking.confirmed
+    booking-cancelled: booking.cancelled
+    payment-success: payment.success
+  queues:
+    booking-confirmed: booking.confirmed.queue
+    booking-cancelled: booking.cancelled.queue
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics
+  endpoint:
+    health:
+      show-details: always
+
+# Logging
+logging:
+  level:
+    com.showtime.booking: DEBUG
+    org.springframework.amqp: WARN
+    io.lettuce: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
